@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sacabambaspis Eater</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-main: 'Montserrat', 'Noto Sans JP', sans-serif;
+    }
+    body {
+      font-family: var(--font-main);
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* 深海のゆらぎ背景 */
+    .water-bg {
+      background: radial-gradient(circle at 50% 30%, rgba(14, 165, 233, 0.15) 0%, transparent 70%),
+                  linear-gradient(180deg, #020617 0%, #0f172a 50%, #020617 100%);
+    }
+
+    /* サカバンバスピスの基本スタイル */
+    .saca {
+      position: absolute;
+      will-change: transform;
+    }
+
+    /* パーティクルエフェクト */
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    @keyframes pop {
+      0% { transform: scale(1) translate(0, 0); opacity: 1; }
+      100% { transform: scale(0) translate(var(--tx), var(--ty)); opacity: 0; }
+    }
+
+    /* 泡のアニメーション */
+    .bubble {
+      position: absolute;
+      bottom: -20px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: rise linear infinite;
+    }
+    @keyframes rise {
+      0% { transform: translateY(0) translateX(0); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(-100vh) translateX(var(--drift)); opacity: 0; }
+    }
+
+    /* 浮遊アニメーション（タイトル画面用） */
+    .animate-float-saca {
+      animation: floatSaca 4s ease-in-out infinite;
+    }
+    @keyframes floatSaca {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-10px) rotate(3deg); }
+      75% { transform: translateY(10px) rotate(-3deg); }
+    }
+
+    /* テキストアニメーション */
+    .pop-text {
+      transition: transform 0.1s;
+    }
+
+    /* プログレスバーと演出用スタイル */
+    .progress-container {
+      width: 100%;
+      height: 24px;
+      background-color: rgba(15, 23, 42, 0.8);
+      border-radius: 12px;
+      border: 2px solid #06b6d4;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #06b6d4, #3b82f6);
+      width: 30%;
+      transition: width 0.2s ease-out, background-color 0.3s;
+    }
+    .progress-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 900;
+      color: white;
+      text-shadow: 0px 1px 3px rgba(0,0,0,0.8);
+    }
+    .warning-bg {
+      animation: pulse-red 1s infinite;
+    }
+    @keyframes pulse-red {
+      0%, 100% { background-color: rgba(239, 68, 68, 0); }
+      50% { background-color: rgba(239, 68, 68, 0.25); }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 overflow-hidden w-screen h-screen touch-none select-none relative">
+  <div id="warning-overlay" class="absolute inset-0 z-0 pointer-events-none transition-colors duration-300"></div>
+
+  <!-- 背景エフェクト -->
+  <div class="water-bg absolute inset-0 z-0"></div>
+  <div id="bg-bubbles" class="absolute inset-0 z-0 overflow-hidden"></div>
+
+  <!-- ゲームオブジェクト格納領域 -->
+  <div id="game-container" class="absolute inset-0 z-10 overflow-hidden"></div>
+  <div id="particle-container" class="absolute inset-0 z-20 pointer-events-none overflow-hidden"></div>
+
+  <!-- HUD (ヘッドアップディスプレイ) -->
+  <div id="hud" class="absolute top-0 left-0 w-full p-6 md:p-8 flex flex-col items-center z-30 hidden pointer-events-none">
+    <span class="text-cyan-500 text-xs md:text-sm font-bold tracking-widest uppercase mb-2 drop-shadow-md">満腹度 (Hunger Gauge)</span>
+    <div class="progress-container max-w-2xl">
+      <div id="fullness-bar" class="progress-bar" style="width: 30%;"></div>
+      <div id="fullness-text" class="progress-text">30%</div>
+    </div>
+    <span id="combo-display" class="pop-text text-lg md:text-xl font-bold text-yellow-400 opacity-0 mt-2 drop-shadow-md">0 COMBO!</span>
+  </div>
+
+  <!-- カウントダウン表示 -->
+  <div id="countdown-display" class="absolute inset-0 z-40 flex items-center justify-center text-8xl md:text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(6,182,212,0.8)] hidden pointer-events-none"></div>
+
+  <!-- スタート画面 -->
+  <div id="start-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-sm bg-slate-950/60">
+    <div class="flex flex-col items-center bg-slate-900/90 p-8 md:p-12 rounded-[2rem] border border-slate-700/50 shadow-2xl max-w-xl text-center">
+      <h1 class="text-4xl md:text-6xl font-black mb-4 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-500 drop-shadow-lg leading-tight">
+        深海の目覚め
+      </h1>
+      <p class="text-slate-300 mb-8 text-sm md:text-base font-medium leading-relaxed">
+        長き眠りから覚めた深海の覇者であるあなたを、猛烈な空腹が襲う。<br>
+        餓死してしまう前にサカバンバスピスを捕食し、<br>
+        <strong class="text-cyan-400 text-lg">満腹度を100%</strong>にして海面を目指せ！
+      </p>
+      
+      <div class="animate-float-saca mb-8">
+        <div class="flex items-center justify-center w-20 h-20 md:w-28 md:h-28 rounded-full bg-slate-800 text-slate-200 border-4 border-cyan-500 shadow-[0_0_40px_rgba(6,182,212,0.4)]">
+          <span class="text-2xl md:text-3xl font-black tracking-widest drop-shadow-md">◉▼◉</span>
+        </div>
+      </div>
+
+      <div class="flex gap-6 text-xs md:text-sm text-slate-400 mb-8 text-center font-bold">
+        <div class="flex flex-col items-center"><span class="text-lg">◉▼◉</span><span class="text-cyan-400 mt-1">回復 (小)</span></div>
+        <div class="flex flex-col items-center"><span class="text-lg text-yellow-400">◉▽◉</span><span class="text-yellow-400 mt-1">回復 (大)</span></div>
+        <div class="flex flex-col items-center"><span class="text-lg text-red-400">◉皿◉</span><span class="text-red-400 mt-1">毒 (満腹度減)</span></div>
+      </div>
+
+      <button id="btn-start" class="px-10 py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-full transition-all duration-300 shadow-[0_0_20px_rgba(6,182,212,0.6)] hover:shadow-[0_0_40px_rgba(6,182,212,0.9)] hover:scale-105 active:scale-95 text-xl tracking-widest">
+        捕食開始 (PLAY)
+      </button>
+    </div>
+  </div>
+
+  <!-- リザルト画面 -->
+  <div id="result-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md bg-slate-950/90 hidden">
+    <div class="flex flex-col items-center text-center max-w-2xl px-6">
+      <p id="result-subtitle" class="text-cyan-500 font-bold tracking-widest uppercase mb-2">Result</p>
+      <h2 id="result-title" class="text-5xl md:text-7xl font-black text-white mb-6 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">-</h2>
+      
+      <div class="bg-slate-900/50 p-6 rounded-3xl border border-slate-700/50 mb-10">
+        <p id="result-story" class="text-slate-300 text-sm md:text-base leading-relaxed font-medium">
+          -
+        </p>
+      </div>
+
+      <button id="btn-retry" class="px-10 py-4 bg-transparent border-2 border-cyan-500 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 font-black rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:scale-105 active:scale-95 text-xl tracking-widest">
+        もう一度プレイ
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // --- 状態管理 ---
+    let gameState = 'start'; // start, playing, end
+    let fullness = 30.0; // 満腹度 (0 - 100)
+    let combo = 0;
+    let sacas = [];
+    let lastTime = 0;
+    let spawnTimeout = null;
+    let gameLoopId = null;
+
+    // --- DOM要素 ---
+    const dom = {
+      startScreen: document.getElementById('start-screen'),
+      resultScreen: document.getElementById('result-screen'),
+      hud: document.getElementById('hud'),
+      countdown: document.getElementById('countdown-display'),
+      fullnessBar: document.getElementById('fullness-bar'),
+      fullnessText: document.getElementById('fullness-text'),
+      combo: document.getElementById('combo-display'),
+      warningOverlay: document.getElementById('warning-overlay'),
+      gameContainer: document.getElementById('game-container'),
+      particleContainer: document.getElementById('particle-container'),
+      btnStart: document.getElementById('btn-start'),
+      btnRetry: document.getElementById('btn-retry'),
+      resultSubtitle: document.getElementById('result-subtitle'),
+      resultTitle: document.getElementById('result-title'),
+      resultStory: document.getElementById('result-story'),
+    };
+
+    // --- 背景の泡生成 ---
+    function initBubbles() {
+      const container = document.getElementById('bg-bubbles');
+      for (let i = 0; i < 25; i++) {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        const size = Math.random() * 15 + 5;
+        bubble.style.width = `${size}px`;
+        bubble.style.height = `${size}px`;
+        bubble.style.left = `${Math.random() * 100}%`;
+        bubble.style.animationDuration = `${Math.random() * 8 + 4}s`;
+        bubble.style.animationDelay = `${Math.random() * 5}s`;
+        bubble.style.setProperty('--drift', `${(Math.random() - 0.5) * 150}px`);
+        container.appendChild(bubble);
+      }
+    }
+
+    // --- ゲーム制御 ---
+    function startGameSequence() {
+      dom.startScreen.classList.add('hidden');
+      dom.resultScreen.classList.add('hidden');
+      dom.countdown.classList.remove('hidden');
+      
+      let count = 3;
+      
+      const animateCount = () => {
+        dom.countdown.style.transition = 'none';
+        dom.countdown.style.transform = 'scale(0.5)';
+        dom.countdown.style.opacity = '0';
+        
+        setTimeout(() => {
+          dom.countdown.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s';
+          dom.countdown.style.transform = 'scale(1)';
+          dom.countdown.style.opacity = '1';
+          
+          if (count > 0) {
+            dom.countdown.textContent = count;
+          } else if (count === 0) {
+            dom.countdown.textContent = 'GO!';
+            dom.countdown.classList.add('text-cyan-400');
+          } else {
+            dom.countdown.classList.add('hidden');
+            dom.countdown.classList.remove('text-cyan-400');
+            startPlaying();
+            return;
+          }
+          count--;
+          setTimeout(animateCount, 800);
+        }, 50);
+      };
+      
+      animateCount();
+    }
+
+    function startPlaying() {
+      fullness = 30.0; // 初期満腹度
+      combo = 0;
+      sacas.forEach(s => s.el.remove());
+      sacas = [];
+      gameState = 'playing';
+      
+      updateHUD();
+      dom.hud.classList.remove('hidden');
+      dom.warningOverlay.classList.remove('warning-bg');
+      
+      lastTime = performance.now();
+      gameLoopId = requestAnimationFrame(gameLoop);
+      scheduleSpawn();
+    }
+
+    function endGame(type) {
+      gameState = 'end';
+      cancelAnimationFrame(gameLoopId);
+      clearTimeout(spawnTimeout);
+      
+      dom.hud.classList.add('hidden');
+      dom.warningOverlay.classList.remove('warning-bg');
+      dom.resultScreen.classList.remove('hidden');
+      
+      if (type === 'clear') {
+        dom.resultSubtitle.textContent = "MISSION ACCOMPLISHED";
+        dom.resultSubtitle.className = "text-yellow-400 font-bold tracking-widest uppercase mb-2";
+        dom.resultTitle.textContent = "進化と旅立ち";
+        dom.resultTitle.className = "text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)]";
+        dom.resultStory.innerHTML = "十分な栄養を摂取したあなたは、真の姿へと進化を遂げた。<br>深い闇を抜け、光射す新たな海域への旅が、今始まる――！";
+        dom.btnRetry.textContent = "もう一度深海からやり直す";
+      } else {
+        dom.resultSubtitle.textContent = "GAME OVER";
+        dom.resultSubtitle.className = "text-red-500 font-bold tracking-widest uppercase mb-2";
+        dom.resultTitle.textContent = "餓死しました";
+        dom.resultTitle.className = "text-5xl md:text-7xl font-black text-white mb-6 drop-shadow-[0_0_20px_rgba(239,68,68,0.5)]";
+        dom.resultStory.innerHTML = "空腹に耐えきれず、あなたは再び果てしない眠りについた...<br>深海の底で、次の目覚めを待つ。";
+        dom.btnRetry.textContent = "もう一度眠りから覚める";
+      }
+    }
+
+    // --- サカバンバスピス管理 ---
+    function scheduleSpawn() {
+      if (gameState !== 'playing') return;
+      spawnSaca();
+      
+      // 満腹度が低い(焦っている)ほど敵が多く出るようにする
+      const rate = Math.max(250, 300 + fullness * 5);
+      spawnTimeout = setTimeout(scheduleSpawn, rate);
+    }
+
+    function spawnSaca() {
+      const size = window.innerWidth < 768 ? 60 : 72;
+      const typeRoll = Math.random();
+      let type = 'normal';
+      let face = '◉▼◉';
+      let colorClass = 'bg-slate-800 border-slate-600 text-slate-200';
+      let shadowClass = 'shadow-[0_0_15px_rgba(0,0,0,0.5)]';
+      let points = 5; // 通常回復量
+      let speedMult = 1;
+
+      if (typeRoll < 0.1) {
+        // ゴールド（10%）
+        type = 'gold'; face = '◉▽◉'; points = 15; speedMult = 1.8;
+        colorClass = 'bg-yellow-500/20 border-yellow-400 text-yellow-300 backdrop-blur-sm';
+        shadowClass = 'shadow-[0_0_20px_rgba(250,204,21,0.6)]';
+      } else if (typeRoll < 0.25) {
+        // 毒（15%）
+        type = 'poison'; face = '◉皿◉'; points = -20; speedMult = 1.2;
+        colorClass = 'bg-red-500/20 border-red-500 text-red-400 backdrop-blur-sm';
+        shadowClass = 'shadow-[0_0_20px_rgba(239,68,68,0.6)]';
+      }
+
+      const el = document.createElement('div');
+      el.className = `saca flex items-center justify-center rounded-full border-2 cursor-crosshair transition-transform duration-100 hover:scale-110 active:scale-90 ${colorClass} ${shadowClass}`;
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      el.innerHTML = `<span class="text-xl md:text-2xl font-black tracking-widest pointer-events-none">${face}</span>`;
+
+      // 物理パラメータ
+      const baseX = Math.random() * (window.innerWidth - size);
+      const baseY = window.innerHeight + size;
+      const speedY = (Math.random() * 3 + 2) * speedMult * (window.innerHeight / 800);
+      const swingWidth = Math.random() * 40 + 20;
+      const swingSpeed = Math.random() * 0.04 + 0.02;
+
+      const sacaObj = {
+        el, type, points, baseX, baseY, currentY: 0, time: Math.random() * 100,
+        speedY, swingWidth, swingSpeed, eaten: false
+      };
+
+      // イベント
+      const onInteract = (e) => {
+        e.preventDefault();
+        if (sacaObj.eaten || gameState !== 'playing') return;
+        sacaObj.eaten = true;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        handleEat(sacaObj, clientX, clientY);
+      };
+
+      el.addEventListener('mousedown', onInteract);
+      el.addEventListener('touchstart', onInteract, {passive: false});
+
+      dom.gameContainer.appendChild(el);
+      sacas.push(sacaObj);
+    }
+
+    // --- メインループ ---
+    function gameLoop(timestamp) {
+      if (gameState !== 'playing') return;
+      
+      const deltaTime = timestamp - lastTime;
+      lastTime = timestamp;
+
+      // 満腹度の自然減少 (1秒間に約2.5%減少 = 40秒放置で餓死)
+      fullness -= (deltaTime / 1000) * 2.5;
+
+      // 判定
+      if (fullness <= 0) {
+        fullness = 0;
+        updateHUD();
+        endGame('over');
+        return;
+      }
+      if (fullness >= 100) {
+        fullness = 100;
+        updateHUD();
+        endGame('clear');
+        return;
+      }
+
+      updateHUD();
+
+      // 警告エフェクト (残り15%以下で画面が赤く脈打つ)
+      if (fullness <= 15) {
+        dom.warningOverlay.classList.add('warning-bg');
+      } else {
+        dom.warningOverlay.classList.remove('warning-bg');
+      }
+
+      // サカバンバスピス更新
+      for (let i = sacas.length - 1; i >= 0; i--) {
+        const s = sacas[i];
+        if (s.eaten) continue;
+
+        s.currentY -= s.speedY;
+        s.time += s.swingSpeed;
+        const currentX = Math.sin(s.time) * s.swingWidth;
+        const actualY = s.baseY + s.currentY;
+
+        s.el.style.transform = `translate(${s.baseX + currentX}px, ${actualY}px)`;
+
+        // 画面上部へ逃げた場合
+        if (actualY < -100) {
+          if (s.type !== 'poison') {
+            combo = 0; // 毒以外を見逃すとコンボリセット
+          }
+          s.el.remove();
+          sacas.splice(i, 1);
+        }
+      }
+
+      gameLoopId = requestAnimationFrame(gameLoop);
+    }
+
+    // --- インタラクション処理 ---
+    function handleEat(sacaObj, x, y) {
+      if (sacaObj.type === 'poison') {
+        fullness = Math.max(0, fullness + sacaObj.points);
+        combo = 0;
+        createParticles(x, y, '#ef4444');
+        flashScreen('rgba(239, 68, 68, 0.4)');
+        showFloatingText(x, y, `DOWN`, 'text-red-500');
+      } else {
+        combo++;
+        const comboBonus = Math.min(combo * 0.5, 5); // コンボで回復量少しアップ
+        const totalPoints = sacaObj.points + comboBonus;
+        fullness = Math.min(100, fullness + totalPoints);
+        
+        const pColor = sacaObj.type === 'gold' ? '#facc15' : '#06b6d4';
+        const tColor = sacaObj.type === 'gold' ? 'text-yellow-300' : 'text-cyan-300';
+        createParticles(x, y, pColor);
+        showFloatingText(x, y, `+${totalPoints.toFixed(1)}%`, tColor);
+      }
+
+      // 捕食アニメーション
+      sacaObj.el.style.transition = 'transform 0.15s cubic-bezier(0.6, -0.28, 0.735, 0.045), opacity 0.15s';
+      sacaObj.el.style.transform = `${sacaObj.el.style.transform} scale(0)`;
+      sacaObj.el.style.opacity = '0';
+      
+      setTimeout(() => {
+        sacaObj.el.remove();
+        sacas = sacas.filter(s => s !== sacaObj);
+      }, 150);
+    }
+
+    // --- 視覚エフェクト ---
+    function createParticles(x, y, color) {
+      const count = 10;
+      for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const size = Math.random() * 8 + 4;
+        p.style.width = `${size}px`;
+        p.style.height = `${size}px`;
+        p.style.backgroundColor = color;
+        p.style.boxShadow = `0 0 10px ${color}`;
+        p.style.left = `${x - size/2}px`;
+        p.style.top = `${y - size/2}px`;
+        
+        const angle = (Math.PI * 2 / count) * i + (Math.random() * 0.5);
+        const distance = Math.random() * 60 + 40;
+        p.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
+        p.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
+        
+        dom.particleContainer.appendChild(p);
+        setTimeout(() => p.remove(), 600);
+      }
+    }
+
+    function showFloatingText(x, y, text, colorClass) {
+      const el = document.createElement('div');
+      el.textContent = text;
+      el.className = `absolute text-xl md:text-2xl font-black font-mono pointer-events-none drop-shadow-[0_0_5px_rgba(0,0,0,0.8)] ${colorClass}`;
+      el.style.left = `${x - 20}px`;
+      el.style.top = `${y - 20}px`;
+      el.style.transition = 'transform 0.8s ease-out, opacity 0.8s ease-out';
+      
+      dom.particleContainer.appendChild(el);
+      
+      // リフローを強制してアニメーション開始
+      void el.offsetWidth;
+      el.style.transform = 'translateY(-50px) scale(1.2)';
+      el.style.opacity = '0';
+      
+      setTimeout(() => el.remove(), 800);
+    }
+
+    function flashScreen(color) {
+      const flash = document.createElement('div');
+      flash.className = 'absolute inset-0 z-40 pointer-events-none opacity-0';
+      flash.style.backgroundColor = color;
+      flash.style.transition = 'opacity 0.1s ease-out';
+      document.body.appendChild(flash);
+      
+      void flash.offsetWidth;
+      flash.style.opacity = '1';
+      
+      setTimeout(() => {
+        flash.style.transition = 'opacity 0.3s ease-in';
+        flash.style.opacity = '0';
+        setTimeout(() => flash.remove(), 300);
+      }, 50);
+    }
+
+    function updateHUD() {
+      // ゲージのUI更新
+      dom.fullnessBar.style.width = `${fullness}%`;
+      dom.fullnessText.textContent = `${Math.floor(fullness)}%`;
+      
+      // ゲージの色を状態に応じて変える
+      if (fullness <= 20) {
+        dom.fullnessBar.style.background = 'linear-gradient(90deg, #ef4444, #f97316)'; // ピンチ (赤)
+      } else if (fullness >= 80) {
+        dom.fullnessBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)'; // もうすぐクリア (緑)
+      } else {
+        dom.fullnessBar.style.background = 'linear-gradient(90deg, #06b6d4, #3b82f6)'; // 通常 (青)
+      }
+
+      // コンボ表示
+      if (combo >= 2) {
+        dom.combo.textContent = `${combo} COMBO!`;
+        dom.combo.style.opacity = '1';
+        dom.combo.style.transform = 'scale(1.3) rotate(-5deg)';
+        setTimeout(() => dom.combo.style.transform = 'scale(1) rotate(0)', 150);
+      } else {
+        dom.combo.style.opacity = '0';
+      }
+    }
+
+    // --- イベントリスナー ---
+    dom.btnStart.addEventListener('click', startGameSequence);
+    dom.btnRetry.addEventListener('click', startGameSequence);
+
+    // 初期化
+    window.onload = initBubbles;
+
+  </script>
+</body>
+</html>
