@@ -34,6 +34,7 @@
       pointer-events: none;
       animation: pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
+
     @keyframes pop {
       0% { transform: scale(1) translate(0, 0); opacity: 1; }
       100% { transform: scale(0) translate(var(--tx), var(--ty)); opacity: 0; }
@@ -48,6 +49,7 @@
       pointer-events: none;
       animation: rise linear infinite;
     }
+
     @keyframes rise {
       0% { transform: translateY(0) translateX(0); opacity: 0; }
       10% { opacity: 1; }
@@ -59,6 +61,7 @@
     .animate-float-saca {
       animation: floatSaca 4s ease-in-out infinite;
     }
+
     @keyframes floatSaca {
       0%, 100% { transform: translateY(0) rotate(0deg); }
       25% { transform: translateY(-10px) rotate(3deg); }
@@ -109,7 +112,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 overflow-hidden w-screen h-screen touch-none select-none relative">
   <div id="warning-overlay" class="absolute inset-0 z-0 pointer-events-none transition-colors duration-300"></div>
-
+  
   <!-- 背景エフェクト -->
   <div class="water-bg absolute inset-0 z-0"></div>
   <div id="bg-bubbles" class="absolute inset-0 z-0 overflow-hidden"></div>
@@ -120,16 +123,38 @@
 
   <!-- HUD (ヘッドアップディスプレイ) -->
   <div id="hud" class="absolute top-0 left-0 w-full p-6 md:p-8 flex flex-col items-center z-30 hidden pointer-events-none">
-    <span class="text-cyan-500 text-xs md:text-sm font-bold tracking-widest uppercase mb-2 drop-shadow-md">満腹度 (Hunger Gauge)</span>
+    <div class="flex justify-between w-full max-w-2xl items-end mb-2">
+      <span class="text-cyan-500 text-xs md:text-sm font-bold tracking-widest uppercase drop-shadow-md">満腹度ゲージ</span>
+      <span id="wave-display" class="text-yellow-400 text-sm md:text-lg font-black tracking-widest uppercase drop-shadow-md">ウェーブ 1</span>
+    </div>
     <div class="progress-container max-w-2xl">
       <div id="fullness-bar" class="progress-bar" style="width: 30%;"></div>
       <div id="fullness-text" class="progress-text">30%</div>
     </div>
-    <span id="combo-display" class="pop-text text-lg md:text-xl font-bold text-yellow-400 opacity-0 mt-2 drop-shadow-md">0 COMBO!</span>
+    <span id="combo-display" class="pop-text text-lg md:text-xl font-bold text-yellow-400 opacity-0 mt-2 drop-shadow-md">0 連続捕食！</span>
+  </div>
+
+  <!-- ボスHP表示 -->
+  <div id="boss-hud" class="absolute top-24 left-0 w-full p-6 flex flex-col items-center z-30 hidden pointer-events-none">
+    <span class="text-red-500 text-sm md:text-base font-black tracking-widest uppercase mb-2 drop-shadow-[0_0_5px_rgba(239,68,68,0.8)] animate-pulse">巨大ヌシバンバスピス</span>
+    <div class="progress-container max-w-xl h-4 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)]">
+      <div id="boss-hp-bar" class="progress-bar" style="background: linear-gradient(90deg, #dc2626, #f87171); width: 100%; transition: width 0.1s;"></div>
+    </div>
   </div>
 
   <!-- カウントダウン表示 -->
   <div id="countdown-display" class="absolute inset-0 z-40 flex items-center justify-center text-8xl md:text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(6,182,212,0.8)] hidden pointer-events-none"></div>
+
+  <!-- スキル選択画面 -->
+  <div id="skill-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md bg-slate-950/80 hidden">
+    <h2 class="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]">
+      進化の選択
+    </h2>
+    <p class="text-slate-300 mb-8 font-bold">ヌシを討伐した！新たな深海能力を1つ獲得せよ。</p>
+    <div class="flex flex-col md:flex-row gap-4 max-w-4xl w-full px-6" id="skill-cards">
+      <!-- JSで動的に生成 -->
+    </div>
+  </div>
 
   <!-- スタート画面 -->
   <div id="start-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-sm bg-slate-950/60">
@@ -139,8 +164,8 @@
       </h1>
       <p class="text-slate-300 mb-8 text-sm md:text-base font-medium leading-relaxed">
         長き眠りから覚めた深海の覇者であるあなたを、猛烈な空腹が襲う。<br>
-        餓死してしまう前にサカバンバスピスを捕食し、<br>
-        <strong class="text-cyan-400 text-lg">満腹度を100%</strong>にして海面を目指せ！
+        画面を<strong class="text-yellow-400">なぞる（スワイプ）</strong>だけでサカバンバスピスを連続捕食！<br>
+        <strong class="text-cyan-400 text-lg">満腹度を100%</strong>にしてヌシを引きずり出せ！
       </p>
       
       <div class="animate-float-saca mb-8">
@@ -164,7 +189,7 @@
   <!-- リザルト画面 -->
   <div id="result-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md bg-slate-950/90 hidden">
     <div class="flex flex-col items-center text-center max-w-2xl px-6">
-      <p id="result-subtitle" class="text-cyan-500 font-bold tracking-widest uppercase mb-2">Result</p>
+      <p id="result-subtitle" class="text-cyan-500 font-bold tracking-widest uppercase mb-2">最終結果</p>
       <h2 id="result-title" class="text-5xl md:text-7xl font-black text-white mb-6 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">-</h2>
       
       <div class="bg-slate-900/50 p-6 rounded-3xl border border-slate-700/50 mb-10">
@@ -174,26 +199,51 @@
       </div>
 
       <button id="btn-retry" class="px-10 py-4 bg-transparent border-2 border-cyan-500 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 font-black rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:scale-105 active:scale-95 text-xl tracking-widest">
-        もう一度プレイ
+        もう一度最初からプレイ
       </button>
     </div>
   </div>
 
   <script>
     // --- 状態管理 ---
-    let gameState = 'start'; // start, playing, end
+    let gameState = 'start'; // start, playing, boss, skillSelect, end
     let fullness = 30.0; // 満腹度 (0 - 100)
     let combo = 0;
+    let wave = 1;
     let sacas = [];
     let lastTime = 0;
     let spawnTimeout = null;
     let gameLoopId = null;
+    let bossHp = 100;
+    let bossAttackTimeout = null;
+    let isDragging = false;
+
+    // --- スキル管理 ---
+    let skills = {
+      magnet: 0,      // 吸引力アップ（捕食判定拡大）
+      digestion: 0,   // 消化器官強化（満腹度減少速度低下）
+      luck: 0,        // 黄金の嗅覚（金サカ率アップ）
+      immunity: 0     // 毒耐性（毒ダメージ軽減）
+    };
+    
+    const skillData = {
+      magnet: { name: "吸引力アップ", desc: "なぞった時の捕食判定範囲が大きくなります", icon: "◎" },
+      digestion: { name: "消化器官強化", desc: "時間経過によるお腹の減り（満腹度減少）が遅くなります", icon: "♥" },
+      luck: { name: "黄金の嗅覚", desc: "回復量の多い「金サカバンバスピス」が少し出やすくなります", icon: "★" },
+      immunity: { name: "毒耐性", desc: "毒サカバンバスピスを食べた時のダメージが減少します", icon: "🛡️" }
+    };
 
     // --- DOM要素 ---
     const dom = {
+      waterBg: document.querySelector('.water-bg'),
       startScreen: document.getElementById('start-screen'),
       resultScreen: document.getElementById('result-screen'),
+      skillScreen: document.getElementById('skill-screen'),
+      skillCards: document.getElementById('skill-cards'),
       hud: document.getElementById('hud'),
+      waveDisplay: document.getElementById('wave-display'),
+      bossHud: document.getElementById('boss-hud'),
+      bossHpBar: document.getElementById('boss-hp-bar'),
       countdown: document.getElementById('countdown-display'),
       fullnessBar: document.getElementById('fullness-bar'),
       fullnessText: document.getElementById('fullness-text'),
@@ -207,6 +257,14 @@
       resultTitle: document.getElementById('result-title'),
       resultStory: document.getElementById('result-story'),
     };
+
+    // --- 座標取得ユーティリティ ---
+    function getPointerPos(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      return { x: e.clientX || 0, y: e.clientY || 0 };
+    }
 
     // --- 背景の泡生成 ---
     function initBubbles() {
@@ -251,9 +309,10 @@
           } else {
             dom.countdown.classList.add('hidden');
             dom.countdown.classList.remove('text-cyan-400');
-            startPlaying();
+            startPlaying(true); // 初回・リトライ時はパラメータリセット
             return;
           }
+          
           count--;
           setTimeout(animateCount, 800);
         }, 50);
@@ -262,10 +321,19 @@
       animateCount();
     }
 
-    function startPlaying() {
-      fullness = 30.0; // 初期満腹度
+    function startPlaying(isReset = false) {
+      if (isReset) {
+        wave = 1;
+        skills = { magnet: 0, digestion: 0, luck: 0, immunity: 0 };
+        fullness = 30.0; 
+      } else {
+        // 次のウェーブへ（スキル取得後）
+        fullness = 100.0; // ウェーブ開始時は満腹状態
+      }
+      
+      dom.waveDisplay.textContent = `ウェーブ ${wave}`;
       combo = 0;
-      sacas.forEach(s => s.el.remove());
+      sacas.forEach(s => { if (s.el.parentNode) s.el.remove(); });
       sacas = [];
       gameState = 'playing';
       
@@ -274,47 +342,47 @@
       dom.warningOverlay.classList.remove('warning-bg');
       
       lastTime = performance.now();
+      cancelAnimationFrame(gameLoopId);
       gameLoopId = requestAnimationFrame(gameLoop);
+      clearTimeout(spawnTimeout);
       scheduleSpawn();
     }
 
-    function endGame(type) {
+    // ゲームオーバー処理
+    function endGame() {
       gameState = 'end';
       cancelAnimationFrame(gameLoopId);
       clearTimeout(spawnTimeout);
+      clearTimeout(bossAttackTimeout);
+      
+      const bossEl = document.getElementById('boss-saca');
+      if (bossEl) bossEl.remove();
+      dom.waterBg.style.background = ''; // 背景を元に戻す
       
       dom.hud.classList.add('hidden');
+      dom.bossHud.classList.add('hidden');
       dom.warningOverlay.classList.remove('warning-bg');
       dom.resultScreen.classList.remove('hidden');
       
-      if (type === 'clear') {
-        dom.resultSubtitle.textContent = "MISSION ACCOMPLISHED";
-        dom.resultSubtitle.className = "text-yellow-400 font-bold tracking-widest uppercase mb-2";
-        dom.resultTitle.textContent = "進化と旅立ち";
-        dom.resultTitle.className = "text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)]";
-        dom.resultStory.innerHTML = "十分な栄養を摂取したあなたは、真の姿へと進化を遂げた。<br>深い闇を抜け、光射す新たな海域への旅が、今始まる――！";
-        dom.btnRetry.textContent = "もう一度深海からやり直す";
-      } else {
-        dom.resultSubtitle.textContent = "GAME OVER";
-        dom.resultSubtitle.className = "text-red-500 font-bold tracking-widest uppercase mb-2";
-        dom.resultTitle.textContent = "餓死しました";
-        dom.resultTitle.className = "text-5xl md:text-7xl font-black text-white mb-6 drop-shadow-[0_0_20px_rgba(239,68,68,0.5)]";
-        dom.resultStory.innerHTML = "空腹に耐えきれず、あなたは再び果てしない眠りについた...<br>深海の底で、次の目覚めを待つ。";
-        dom.btnRetry.textContent = "もう一度眠りから覚める";
-      }
+      dom.resultSubtitle.textContent = "ゲームオーバー";
+      dom.resultSubtitle.className = "text-red-500 font-bold tracking-widest uppercase mb-2";
+      dom.resultTitle.textContent = "餓死しました";
+      dom.resultTitle.className = "text-5xl md:text-7xl font-black text-white mb-6 drop-shadow-[0_0_20px_rgba(239,68,68,0.5)]";
+      dom.resultStory.innerHTML = `到達したウェーブ数: <strong class="text-yellow-400 text-2xl">${wave}</strong><br><br>空腹に耐えきれず、あなたは再び果てしない眠りについた...<br>深海の底で、次の目覚めを待つ。`;
     }
 
     // --- サカバンバスピス管理 ---
     function scheduleSpawn() {
-      if (gameState !== 'playing') return;
+      if (gameState !== 'playing' && gameState !== 'boss') return;
+      
       spawnSaca();
       
-      // 満腹度が低い(焦っている)ほど敵が多く出るようにする
-      const rate = Math.max(250, 300 + fullness * 5);
+      // 満腹度が低い＆ウェーブが進むほど敵が多く出る
+      const rate = Math.max(80, 200 + fullness * 4 - (wave - 1) * 20);
       spawnTimeout = setTimeout(scheduleSpawn, rate);
     }
 
-    function spawnSaca() {
+    function spawnSaca(isBossAttack = false) {
       const size = window.innerWidth < 768 ? 60 : 72;
       const typeRoll = Math.random();
       let type = 'normal';
@@ -322,76 +390,209 @@
       let colorClass = 'bg-slate-800 border-slate-600 text-slate-200';
       let shadowClass = 'shadow-[0_0_15px_rgba(0,0,0,0.5)]';
       let points = 5; // 通常回復量
-      let speedMult = 1;
+      
+      // ウェーブが進むと全体的にスピードアップ
+      let speedMult = 1 + (wave - 1) * 0.15;
 
-      if (typeRoll < 0.1) {
-        // ゴールド（10%）
-        type = 'gold'; face = '◉▽◉'; points = 15; speedMult = 1.8;
-        colorClass = 'bg-yellow-500/20 border-yellow-400 text-yellow-300 backdrop-blur-sm';
-        shadowClass = 'shadow-[0_0_20px_rgba(250,204,21,0.6)]';
-      } else if (typeRoll < 0.25) {
-        // 毒（15%）
-        type = 'poison'; face = '◉皿◉'; points = -20; speedMult = 1.2;
+      let baseX = Math.random() * (window.innerWidth - size);
+      let baseY = window.innerHeight + size;
+      let speedY = (Math.random() * 5 + 3) * speedMult * (window.innerHeight / 800);
+
+      // スキルとウェーブによる出現率の計算
+      const goldRate = 0.05 + skills.luck * 0.03; // luckスキルで金サカ増加
+      const poisonRate = Math.min(0.5, 0.30 + (wave - 1) * 0.03); // WAVEで毒増加(最大50%)
+
+      if (isBossAttack) {
+        // ボスからの攻撃（毒確定）
+        type = 'poison'; face = '◉皿◉'; speedMult = 1.3 + (wave - 1) * 0.1;
         colorClass = 'bg-red-500/20 border-red-500 text-red-400 backdrop-blur-sm';
         shadowClass = 'shadow-[0_0_20px_rgba(239,68,68,0.6)]';
+        
+        // ボスの位置が下に移動したため、吐き出される座標もボスの位置(約30vh + 半径)に調整
+        baseX = window.innerWidth / 2 + (Math.random() - 0.5) * 200 - size/2;
+        baseY = window.innerHeight * 0.3 + 100; 
+        speedY = -((Math.random() * 5 + 3) * (window.innerHeight / 800)); // 下方向へ
+        
+        let dmg = -20 - (wave - 1) * 3;
+        points = Math.min(-5, dmg + skills.immunity * 4); // immunityスキルで軽減
+      } else if (typeRoll < goldRate) {
+        // ゴールド
+        type = 'gold'; face = '◉▽◉'; points = 15; speedMult = 1.8 + (wave - 1) * 0.2;
+        colorClass = 'bg-yellow-500/20 border-yellow-400 text-yellow-300 backdrop-blur-sm';
+        shadowClass = 'shadow-[0_0_20px_rgba(250,204,21,0.6)]';
+      } else if (typeRoll < goldRate + poisonRate) {
+        // 毒
+        type = 'poison'; face = '◉皿◉'; speedMult = 1.2 + (wave - 1) * 0.1;
+        colorClass = 'bg-red-500/20 border-red-500 text-red-400 backdrop-blur-sm';
+        shadowClass = 'shadow-[0_0_20px_rgba(239,68,68,0.6)]';
+        
+        let dmg = -25 - (wave - 1) * 3;
+        points = Math.min(-5, dmg + skills.immunity * 4); // immunityスキルで軽減
       }
 
       const el = document.createElement('div');
-      el.className = `saca flex items-center justify-center rounded-full border-2 cursor-crosshair transition-transform duration-100 hover:scale-110 active:scale-90 ${colorClass} ${shadowClass}`;
+      el.className = `saca flex items-center justify-center rounded-full border-2 transition-transform duration-100 ${colorClass} ${shadowClass}`;
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
       el.innerHTML = `<span class="text-xl md:text-2xl font-black tracking-widest pointer-events-none">${face}</span>`;
 
       // 物理パラメータ
-      const baseX = Math.random() * (window.innerWidth - size);
-      const baseY = window.innerHeight + size;
-      const speedY = (Math.random() * 3 + 2) * speedMult * (window.innerHeight / 800);
       const swingWidth = Math.random() * 40 + 20;
       const swingSpeed = Math.random() * 0.04 + 0.02;
 
       const sacaObj = {
         el, type, points, baseX, baseY, currentY: 0, time: Math.random() * 100,
-        speedY, swingWidth, swingSpeed, eaten: false
+        speedY, swingWidth, swingSpeed, eaten: false, size,
+        currentAbsX: 0, currentAbsY: 0
       };
-
-      // イベント
-      const onInteract = (e) => {
-        e.preventDefault();
-        if (sacaObj.eaten || gameState !== 'playing') return;
-        sacaObj.eaten = true;
-        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-        handleEat(sacaObj, clientX, clientY);
-      };
-
-      el.addEventListener('mousedown', onInteract);
-      el.addEventListener('touchstart', onInteract, {passive: false});
 
       dom.gameContainer.appendChild(el);
       sacas.push(sacaObj);
     }
 
+    // --- ボス戦管理 ---
+    function startBossBattle() {
+      gameState = 'boss';
+      // WAVEが進むごとにボスのHPが増加
+      bossHp = 100 + (wave - 1) * 30; 
+      const maxBossHp = bossHp;
+      
+      dom.waterBg.style.background = 'radial-gradient(circle at 50% 30%, rgba(220, 38, 38, 0.15) 0%, transparent 70%), linear-gradient(180deg, #020617 0%, #450a0a 50%, #020617 100%)';
+      flashScreen('rgba(239, 68, 68, 0.5)');
+      
+      dom.bossHud.classList.remove('hidden');
+      dom.bossHpBar.style.width = '100%';
+      
+      // ボス要素の生成
+      const bossEl = document.createElement('div');
+      bossEl.id = 'boss-saca';
+      // 操作性を高めるため、出現位置を top-32 から 画面の30%の高さ (top-[30vh]) へ引き下げ
+      bossEl.className = 'absolute top-[30vh] left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full bg-slate-950 border-4 border-red-600 shadow-[0_0_60px_rgba(220,38,38,0.8)] text-red-500 cursor-crosshair select-none touch-none z-10';
+      const bossSize = window.innerWidth < 768 ? 160 : 220;
+      bossEl.style.width = `${bossSize}px`;
+      bossEl.style.height = `${bossSize}px`;
+      bossEl.innerHTML = `<span class="text-6xl md:text-8xl font-black tracking-widest pointer-events-none drop-shadow-[0_0_10px_rgba(239,68,68,1)]">◉▼◉</span>`;
+      
+      // ボスへのダメージ判定（ボス専用イベント）
+      const hitBoss = (e) => {
+        e.preventDefault();
+        if (gameState !== 'boss') return;
+        
+        bossHp -= 2.0; 
+        fullness = Math.min(100, fullness + 1.5); 
+        
+        const pos = getPointerPos(e);
+        createParticles(pos.x, pos.y, '#ef4444');
+        
+        // シェイクアニメーション
+        const shakeX = (Math.random() - 0.5) * 30;
+        const shakeY = (Math.random() - 0.5) * 30;
+        bossEl.style.transform = `translate(calc(-50% + ${shakeX}px), ${shakeY}px) scale(0.95)`;
+        setTimeout(() => {
+          if(bossEl) bossEl.style.transform = 'translate(-50%, 0) scale(1)';
+        }, 50);
+        
+        dom.bossHpBar.style.width = `${Math.max(0, (bossHp / maxBossHp) * 100)}%`;
+        
+        // ボス撃破
+        if (bossHp <= 0) {
+          createParticles(window.innerWidth/2, window.innerHeight * 0.3 + 100, '#facc15');
+          createParticles(window.innerWidth/2 - 50, window.innerHeight * 0.3 + 50, '#facc15');
+          createParticles(window.innerWidth/2 + 50, window.innerHeight * 0.3 + 50, '#facc15');
+          bossEl.remove();
+          dom.bossHud.classList.add('hidden');
+          
+          showSkillSelection(); // スキル選択画面へ
+        }
+      };
+      
+      bossEl.addEventListener('mousedown', hitBoss);
+      bossEl.addEventListener('touchstart', hitBoss, {passive: false});
+      
+      dom.gameContainer.appendChild(bossEl);
+      
+      scheduleBossAttack();
+    }
+
+    function scheduleBossAttack() {
+      if (gameState !== 'boss') return;
+      
+      // WAVEが進むと一度に吐き出す数が増加
+      const count = Math.floor(Math.random() * 3) + 2 + Math.floor(wave / 2);
+      for(let i = 0; i < count; i++) {
+        spawnSaca(true);
+      }
+      
+      // 攻撃間隔も短縮
+      const delay = Math.max(400, 800 - (wave - 1) * 50) + Math.random() * 800;
+      bossAttackTimeout = setTimeout(scheduleBossAttack, delay);
+    }
+
+    // --- スキル選択画面 ---
+    function showSkillSelection() {
+      gameState = 'skillSelect';
+      clearTimeout(spawnTimeout);
+      clearTimeout(bossAttackTimeout);
+      dom.waterBg.style.background = ''; // 禍々しい背景を戻す
+      
+      // 画面上の雑魚サカをクリア
+      sacas.forEach(s => { if (s.el.parentNode) s.el.remove(); });
+      sacas = [];
+      
+      dom.skillScreen.classList.remove('hidden');
+      
+      // スキルをランダムに3つ選出
+      const skillKeys = Object.keys(skillData);
+      skillKeys.sort(() => 0.5 - Math.random());
+      const choices = skillKeys.slice(0, 3);
+      
+      dom.skillCards.innerHTML = '';
+      
+      choices.forEach(key => {
+        const skill = skillData[key];
+        const currentLv = skills[key];
+        const card = document.createElement('button');
+        card.className = "flex-1 bg-slate-900 border-2 border-cyan-500/50 hover:border-cyan-400 rounded-2xl p-6 text-left transition-all hover:-translate-y-2 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] group";
+        card.innerHTML = `
+          <div class="text-4xl mb-4">${skill.icon}</div>
+          <h3 class="text-xl md:text-2xl font-black text-cyan-300 mb-2 group-hover:text-cyan-100">${skill.name} <span class="text-yellow-400 text-sm ml-2">レベル ${currentLv} &rarr; ${currentLv + 1}</span></h3>
+          <p class="text-slate-300 text-sm md:text-base font-medium">${skill.desc}</p>
+        `;
+        card.onclick = () => {
+          skills[key]++;
+          dom.skillScreen.classList.add('hidden');
+          wave++;
+          startPlaying(false); // 次のウェーブ開始
+        };
+        dom.skillCards.appendChild(card);
+      });
+    }
+
+
     // --- メインループ ---
     function gameLoop(timestamp) {
-      if (gameState !== 'playing') return;
+      if (gameState !== 'playing' && gameState !== 'boss') return;
       
       const deltaTime = timestamp - lastTime;
       lastTime = timestamp;
 
-      // 満腹度の自然減少 (1秒間に約2.5%減少 = 40秒放置で餓死)
-      fullness -= (deltaTime / 1000) * 2.5;
+      // 満腹度が100に達したらボス戦へ
+      if (fullness >= 100 && gameState === 'playing') {
+        startBossBattle();
+      } else if (fullness > 100) {
+        fullness = 100;
+      }
+
+      // 満腹度の自然減少計算 (WAVE進行で激しくなるが、digestionスキルで軽減)
+      let baseDrain = gameState === 'boss' ? (8.0 + wave) : (4.5 + wave * 0.6);
+      baseDrain = Math.max(1.0, baseDrain - skills.digestion * 1.2);
+      fullness -= (deltaTime / 1000) * baseDrain;
 
       // 判定
       if (fullness <= 0) {
         fullness = 0;
         updateHUD();
-        endGame('over');
-        return;
-      }
-      if (fullness >= 100) {
-        fullness = 100;
-        updateHUD();
-        endGame('clear');
+        endGame();
         return;
       }
 
@@ -411,17 +612,20 @@
 
         s.currentY -= s.speedY;
         s.time += s.swingSpeed;
-        const currentX = Math.sin(s.time) * s.swingWidth;
-        const actualY = s.baseY + s.currentY;
+        const offsetX = Math.sin(s.time) * s.swingWidth;
+        
+        // 絶対座標を計算して保持（当たり判定用）
+        s.currentAbsX = s.baseX + offsetX;
+        s.currentAbsY = s.baseY + s.currentY;
 
-        s.el.style.transform = `translate(${s.baseX + currentX}px, ${actualY}px)`;
+        s.el.style.transform = `translate(${s.currentAbsX}px, ${s.currentAbsY}px)`;
 
-        // 画面上部へ逃げた場合
-        if (actualY < -100) {
-          if (s.type !== 'poison') {
+        // 画面外へ逃げた場合
+        if (s.currentAbsY < -100 || s.currentAbsY > window.innerHeight + 100) {
+          if (s.type !== 'poison' && gameState === 'playing') {
             combo = 0; // 毒以外を見逃すとコンボリセット
           }
-          s.el.remove();
+          if (s.el.parentNode) s.el.remove();
           sacas.splice(i, 1);
         }
       }
@@ -429,22 +633,50 @@
       gameLoopId = requestAnimationFrame(gameLoop);
     }
 
-    // --- インタラクション処理 ---
+    // --- 当たり判定処理 ---
+    function checkCatch(clientX, clientY) {
+      if (gameState !== 'playing' && gameState !== 'boss') return;
+      
+      // スキル「吸引力アップ」で当たり判定の円が広がる
+      const catchRadius = 5 + skills.magnet * 10; 
+      
+      for (let i = sacas.length - 1; i >= 0; i--) {
+        const s = sacas[i];
+        if (s.eaten) continue;
+        
+        // 中心座標
+        const centerX = s.currentAbsX + s.size / 2;
+        const centerY = s.currentAbsY + s.size / 2;
+        
+        const dx = clientX - centerX;
+        const dy = clientY - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // サカバンバスピスの半径(size/2) + 吸引範囲(catchRadius)
+        if (dist <= catchRadius + (s.size / 2)) {
+          s.eaten = true;
+          handleEat(s, clientX, clientY);
+        }
+      }
+    }
+
+    // --- 捕食インタラクション処理 ---
     function handleEat(sacaObj, x, y) {
       if (sacaObj.type === 'poison') {
         fullness = Math.max(0, fullness + sacaObj.points);
         combo = 0;
         createParticles(x, y, '#ef4444');
         flashScreen('rgba(239, 68, 68, 0.4)');
-        showFloatingText(x, y, `DOWN`, 'text-red-500');
+        showFloatingText(x, y, `満腹度減少`, 'text-red-500');
       } else {
         combo++;
-        const comboBonus = Math.min(combo * 0.5, 5); // コンボで回復量少しアップ
+        const comboBonus = Math.min(combo * 0.5, 5); // コンボボーナス
         const totalPoints = sacaObj.points + comboBonus;
-        fullness = Math.min(100, fullness + totalPoints);
+        fullness += totalPoints; 
         
         const pColor = sacaObj.type === 'gold' ? '#facc15' : '#06b6d4';
         const tColor = sacaObj.type === 'gold' ? 'text-yellow-300' : 'text-cyan-300';
+        
         createParticles(x, y, pColor);
         showFloatingText(x, y, `+${totalPoints.toFixed(1)}%`, tColor);
       }
@@ -455,7 +687,7 @@
       sacaObj.el.style.opacity = '0';
       
       setTimeout(() => {
-        sacaObj.el.remove();
+        if(sacaObj.el.parentNode) sacaObj.el.remove();
         sacas = sacas.filter(s => s !== sacaObj);
       }, 150);
     }
@@ -521,7 +753,7 @@
 
     function updateHUD() {
       // ゲージのUI更新
-      dom.fullnessBar.style.width = `${fullness}%`;
+      dom.fullnessBar.style.width = `${Math.min(100, fullness)}%`;
       dom.fullnessText.textContent = `${Math.floor(fullness)}%`;
       
       // ゲージの色を状態に応じて変える
@@ -535,7 +767,7 @@
 
       // コンボ表示
       if (combo >= 2) {
-        dom.combo.textContent = `${combo} COMBO!`;
+        dom.combo.textContent = `${combo} 連続捕食！`;
         dom.combo.style.opacity = '1';
         dom.combo.style.transform = 'scale(1.3) rotate(-5deg)';
         setTimeout(() => dom.combo.style.transform = 'scale(1) rotate(0)', 150);
@@ -544,13 +776,38 @@
       }
     }
 
+    // --- 入力（スワイプ/タップ）イベント管理 ---
+    window.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      const pos = getPointerPos(e);
+      checkCatch(pos.x, pos.y);
+    });
+    window.addEventListener('mouseup', () => isDragging = false);
+    
+    window.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      const pos = getPointerPos(e);
+      checkCatch(pos.x, pos.y);
+    });
+    window.addEventListener('touchend', () => isDragging = false);
+
+    function handlePointerMove(e) {
+      if (!isDragging) return;
+      if (e.type === 'touchmove' && e.target.closest('#game-container')) {
+        e.preventDefault(); // スクロール防止
+      }
+      const pos = getPointerPos(e);
+      checkCatch(pos.x, pos.y);
+    }
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('touchmove', handlePointerMove, {passive: false});
+
     // --- イベントリスナー ---
     dom.btnStart.addEventListener('click', startGameSequence);
     dom.btnRetry.addEventListener('click', startGameSequence);
 
     // 初期化
     window.onload = initBubbles;
-
   </script>
 </body>
 </html>
